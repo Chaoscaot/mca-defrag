@@ -3,6 +3,7 @@ mod writer;
 
 use std::fs::File;
 use std::io;
+use std::io::Cursor;
 use clap::{Arg, ArgAction, Command, ValueHint};
 use crate::parser::Chunks;
 
@@ -51,8 +52,8 @@ fn main() {
     let elapsed = start.elapsed();
 
     if !quiet {
-        println!("Saved {:.1}kB, ({:.1}%) in {}ms",
-                 (total_read - total_written) as f32 / 1024f32,
+        println!("Saved {:.1}MiB, ({:.1}%) in {}ms",
+                 (total_read - total_written) as f32 / 1024f32 / 1024f32,
                  (total_read - total_written) as f32 / total_read as f32 * 100f32,
                  elapsed.as_millis()
         );
@@ -67,14 +68,16 @@ fn defrag(path: &String, quiet: bool, dry: bool) -> io::Result<(u64, u64)> {
     };
 
     let chunks = read(path)?;
-    let len = write(chunks.chunks, path, dry)?;
+    let len = write(chunks.chunks, path, chunks.initial_size, dry)?;
 
-    if !quiet {
+    let saved = (chunks.initial_size - len) as f32 / 1024f32 / 1024f32;
+
+    if !quiet && saved > 1f32 {
         let elapsed = start.unwrap().elapsed();
 
-        println!("{}: Saved {:.1}kB, ({:.1}%) in {}ms",
+        println!("{}: Saved {:.1}MiB, ({:.1}%) in {}ms",
                  path,
-                 (chunks.initial_size - len) as f32 / 1024f32,
+                 saved,
                  (chunks.initial_size - len) as f32 / chunks.initial_size as f32 * 100f32,
                  elapsed.as_millis()
         );
@@ -97,18 +100,35 @@ fn read(path: &String) -> io::Result<ReadResult> {
     })
 }
 
-fn write(chunks: Chunks, path: &String, dry: bool) -> io::Result<u64> {
-    let len = 8 * 1024 + 4098 * chunks.true_size as u64;
+fn write(chunks: Chunks, path: &String, initial_size: u64, dry: bool) -> io::Result<u64> {
+    let mut buf: Vec<u8> = Vec::with_capacity(8 * 1024 + 4098 * chunks.true_size);
+    let cursor = Cursor::new(&mut buf);
+
+    writer::write_rca(chunks, cursor)?;
+
+    let mut last_zeros = 0u64;
+
+    for i in (0..buf.len()).rev() {
+        if buf[i] == 0 {
+            last_zeros += 1;
+        } else {
+            break;
+        }
+    }
+
+    let len = buf.len() as u64 - last_zeros;
 
     if dry {
         return Ok(len)
     }
 
+    if len >= initial_size {
+        return Ok(initial_size)
+    }
+
     let out = File::create(path)?;
 
     out.set_len(len)?;
-
-    writer::write_rca(chunks, out)?;
 
     Ok(len)
 }

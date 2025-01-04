@@ -68,7 +68,7 @@ pub fn parse_mca<R: Read>(f: &mut R) -> io::Result<Chunks> {
 
         for _ in 0..chunk_location.size {
             let mut chunk_data = [0u8; 4096];
-            f.read_exact(&mut chunk_data)?;
+            f.read(&mut chunk_data)?;
             blocks.push(chunk_data);
         }
 
