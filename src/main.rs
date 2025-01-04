@@ -3,7 +3,7 @@ mod writer;
 
 use std::fs::File;
 use std::io;
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 use clap::{Arg, ArgAction, Command, ValueHint};
 use crate::parser::Chunks;
 
@@ -126,9 +126,11 @@ fn write(chunks: Chunks, path: &String, initial_size: u64, dry: bool) -> io::Res
         return Ok(len)
     }
 
-    let out = File::create(path)?;
+    let mut out = File::create(path)?;
 
     out.set_len(len)?;
+
+    out.write_all(&buf)?;
 
     Ok(len)
 }
