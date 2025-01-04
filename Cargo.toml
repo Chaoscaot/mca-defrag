@@ -1,0 +1,8 @@
+[package]
+name = "rca-comp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = "1.42.0"
+clap = "4.5.23"
