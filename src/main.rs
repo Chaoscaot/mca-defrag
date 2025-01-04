@@ -118,12 +118,12 @@ fn write(chunks: Chunks, path: &String, initial_size: u64, dry: bool) -> io::Res
 
     let len = buf.len() as u64 - last_zeros;
 
-    if dry {
-        return Ok(len)
-    }
-
     if len >= initial_size {
         return Ok(initial_size)
+    }
+
+    if dry {
+        return Ok(len)
     }
 
     let out = File::create(path)?;
