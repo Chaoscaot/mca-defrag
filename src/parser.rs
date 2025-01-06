@@ -1,7 +1,7 @@
 use std::io;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct ChunkLocation {
     pub offset: usize,
     pub size: usize,
@@ -9,7 +9,7 @@ pub struct ChunkLocation {
     pub z: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Chunk {
     pub location: ChunkLocation,
     pub data: Vec<[u8; 4096]>,
@@ -22,7 +22,7 @@ pub struct Chunks {
     pub timestamps: [u8; 4096],
 }
 
-pub fn parse_mca<R: Read>(f: &mut R) -> io::Result<Chunks> {
+pub fn parse_mca<R: Read + Seek>(f: &mut R) -> io::Result<Chunks> {
     let mut locations_header = [0u8; 1024 * 4];
 
     f.read_exact(&mut locations_header)?;
@@ -33,9 +33,9 @@ pub fn parse_mca<R: Read>(f: &mut R) -> io::Result<Chunks> {
 
     let mut cursor = Cursor::new(&locations_header);
 
-    let mut chunk_locations = Vec::new();
-
     let mut true_size = 0usize;
+
+    let mut chunks = Vec::new();
 
     for z in 0..32 {
         for x in 0..32 {
@@ -50,32 +50,26 @@ pub fn parse_mca<R: Read>(f: &mut R) -> io::Result<Chunks> {
 
             true_size += size;
 
-            chunk_locations.push(ChunkLocation {
-                offset,
-                size,
-                x,
-                z,
-            })
+            f.seek(SeekFrom::Start(offset as u64 * 4096))?;
+
+            let mut blocks = Vec::with_capacity(size);
+
+            for _ in 0..size {
+                let mut block = [0u8; 4096];
+                f.read(&mut block[..])?;
+                blocks.push(block);
+            }
+
+            chunks.push(Chunk {
+                location: ChunkLocation {
+                    offset,
+                    size,
+                    x: x as u8,
+                    z: z as u8,
+                },
+                data: blocks,
+            });
         }
-    }
-
-    let mut chunks = Vec::new();
-
-    chunk_locations.sort_by(|a, b| a.offset.cmp(&b.offset));
-
-    for chunk_location in chunk_locations {
-        let mut blocks = Vec::with_capacity(chunk_location.size);
-
-        for _ in 0..chunk_location.size {
-            let mut chunk_data = [0u8; 4096];
-            f.read(&mut chunk_data)?;
-            blocks.push(chunk_data);
-        }
-
-        chunks.push(Chunk {
-            location: chunk_location,
-            data: blocks,
-        });
     }
 
     Ok(Chunks {

@@ -7,7 +7,7 @@ pub fn write_rca<W: Write>(chunks: Chunks, mut w: W) -> io::Result<()> {
     let mut c = HashMap::new();
 
     for chunk in chunks.chunks {
-        c.insert((chunk.location.x, chunk.location.z), chunk);
+        c.insert(format!("{}:{}", chunk.location.x, chunk.location.z), chunk);
     }
 
     let mut header = [0u8; 1024 * 4];
@@ -19,7 +19,7 @@ pub fn write_rca<W: Write>(chunks: Chunks, mut w: W) -> io::Result<()> {
 
     for z in 0..32 {
         for x in 0..32 {
-            let chunk = c.get(&(x, z)).unwrap();
+            let chunk = c.get(&format!("{}:{}", x, z)).unwrap();
 
             let mut location = offset;
 
@@ -34,7 +34,7 @@ pub fn write_rca<W: Write>(chunks: Chunks, mut w: W) -> io::Result<()> {
 
             offset += chunk.location.size;
 
-            header_buf.write_all(&header_bytes).unwrap();
+            header_buf.write_all(&header_bytes)?;
 
             for block in &chunk.data {
                 all_blocks.push(block);

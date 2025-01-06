@@ -14,7 +14,6 @@ fn main() {
             .required(true)
             .action(ArgAction::Append)
             .trailing_var_arg(true)
-            .default_missing_values(vec!["r.0.-1.mca"])
             .help("The input file to defrag")
             .value_hint(ValueHint::FilePath))
         .arg(Arg::new("dry")
@@ -57,6 +56,15 @@ fn main() {
                  (total_read - total_written) as f32 / total_read as f32 * 100f32,
                  elapsed.as_millis()
         );
+    }
+}
+
+mod test {
+    use crate::defrag;
+
+    #[test]
+    fn test_defrag() {
+        defrag(&"r.0.-1.mca".to_string(), false, true).unwrap();
     }
 }
 
