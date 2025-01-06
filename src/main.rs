@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io;
 use std::io::{Cursor, Write};
 use clap::{Arg, ArgAction, Command, ValueHint};
+use memmap2::{Mmap};
 use crate::parser::Chunks;
 
 fn main() {
@@ -70,7 +71,7 @@ mod test {
 
     #[test]
     fn test_defrag() {
-        defrag(&"r.0.-1.mca".to_string(), false, true).unwrap();
+        defrag(&"r.0.-1.mca".to_string(), false, true, false).unwrap();
     }
 }
 
@@ -108,8 +109,12 @@ fn read(path: &String) -> io::Result<ReadResult> {
 
     let initial_size = file.metadata()?.len();
 
+    let mmap = unsafe { Mmap::map(&file)? };
+
+    let mut cursor = Cursor::new(&mmap);
+
     Ok(ReadResult {
-        chunks: parser::parse_mca(&mut file)?,
+        chunks: parser::parse_mca(&mut cursor)?,
         initial_size
     })
 }
