@@ -111,6 +111,8 @@ fn read(path: &String) -> io::Result<ReadResult> {
 
     let mmap = unsafe { Mmap::map(&file)? };
 
+    mmap.lock()?;
+
     let mut cursor = Cursor::new(&mmap);
 
     Ok(ReadResult {
