@@ -3,7 +3,7 @@ mod writer;
 
 use std::fs::File;
 use std::io;
-use std::io::{Cursor, Write};
+use std::io::{Cursor, Read, Write};
 use clap::{Arg, ArgAction, Command, ValueHint};
 use memmap2::{Mmap};
 use crate::parser::Chunks;
@@ -109,11 +109,11 @@ fn read(path: &String) -> io::Result<ReadResult> {
 
     let initial_size = file.metadata()?.len();
 
-    let mmap = unsafe { Mmap::map(&file)? };
+    let mut buf = Vec::with_capacity(initial_size as usize);
 
-    mmap.lock()?;
+    file.read_to_end(&mut buf)?;
 
-    let mut cursor = Cursor::new(&mmap);
+    let mut cursor = Cursor::new(&buf[..]);
 
     Ok(ReadResult {
         chunks: parser::parse_mca(&mut cursor)?,
