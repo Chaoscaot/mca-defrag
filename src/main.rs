@@ -21,6 +21,11 @@ fn main() {
             .short('d')
             .help("Dry run, don't write the output")
             .action(ArgAction::SetTrue))
+        .arg(Arg::new("remove-padding")
+            .short('r')
+            .long("remove-padding")
+            .help("Remove the padding at the end of the file")
+            .action(ArgAction::SetTrue))
         .arg(Arg::new("quiet")
             .long("quiet")
             .short('q')
@@ -31,6 +36,7 @@ fn main() {
 
     let quiet = matches.get_flag("quiet");
     let dry = matches.get_flag("dry");
+    let remove_padding = matches.get_flag("remove-padding");
 
     let mut total_read = 0u64;
     let mut total_written = 0u64;
@@ -38,7 +44,7 @@ fn main() {
     let start = std::time::Instant::now();
 
     for x in matches.get_many::<String>("input").unwrap() {
-        let result = defrag(x, quiet, dry);
+        let result = defrag(x, quiet, dry, remove_padding);
         if let Err(e) = result {
             eprintln!("Error: {}", e);
         } else if let Ok((read, written)) = result {
@@ -68,7 +74,7 @@ mod test {
     }
 }
 
-fn defrag(path: &String, quiet: bool, dry: bool) -> io::Result<(u64, u64)> {
+fn defrag(path: &String, quiet: bool, dry: bool, remove_padding: bool) -> io::Result<(u64, u64)> {
     let start = if !quiet {
         Some(std::time::Instant::now())
     } else {
@@ -76,7 +82,7 @@ fn defrag(path: &String, quiet: bool, dry: bool) -> io::Result<(u64, u64)> {
     };
 
     let chunks = read(path)?;
-    let len = write(chunks.chunks, path, chunks.initial_size, dry)?;
+    let len = write(chunks.chunks, path, chunks.initial_size, dry, remove_padding)?;
 
     let saved = (chunks.initial_size - len) as f32 / 1024f32 / 1024f32;
 
@@ -108,7 +114,7 @@ fn read(path: &String) -> io::Result<ReadResult> {
     })
 }
 
-fn write(chunks: Chunks, path: &String, initial_size: u64, dry: bool) -> io::Result<u64> {
+fn write(chunks: Chunks, path: &String, initial_size: u64, dry: bool, remove_padding: bool) -> io::Result<u64> {
     let mut buf: Vec<u8> = Vec::with_capacity(8 * 1024 + 4098 * chunks.true_size);
     let cursor = Cursor::new(&mut buf);
 
@@ -116,11 +122,13 @@ fn write(chunks: Chunks, path: &String, initial_size: u64, dry: bool) -> io::Res
 
     let mut last_zeros = 0u64;
 
-    for i in (0..buf.len()).rev() {
-        if buf[i] == 0 {
-            last_zeros += 1;
-        } else {
-            break;
+    if remove_padding {
+        for i in (0..buf.len()).rev() {
+            if buf[i] == 0 {
+                last_zeros += 1;
+            } else {
+                break;
+            }
         }
     }
 
